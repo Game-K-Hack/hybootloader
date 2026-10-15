@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/logo_readme.png" alt="HyBootloader" width="380">
+  <img src="docs/logo_readme.png" alt="HyBootloader" height="128">
 </p>
 
 <p align="center">
