@@ -1,0 +1,4 @@
+# Produits de compilation : l'exe est distribue en Release GitHub
+bin/
+*.obj
+*.res
