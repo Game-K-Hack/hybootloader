@@ -39,6 +39,11 @@ HyBootloader is a single C/Win32 executable of less than 100 KB, with
 **nothing to configure**: drop your programs in a `programmes` folder and each one
 gets its own button.
 
+![HyBootloader on the head unit](docs/01_lanceur.png)
+
+<sub>Screenshots taken on the head unit (800 × 480). Tile names are the file names,
+as stored on the card.</sub>
+
 ## Features
 
 | | |
@@ -116,6 +121,8 @@ keys. HyBootloader uses other class names, so the keys keep working.
 A program without a window (a background agent) is never started twice: tapping its
 tile again does nothing.
 
+![The floating icon above another application](docs/02_icone_flottante.png)
+
 ### Programs that use WiFi
 
 The launcher HyBootloader replaces switched the WiFi on behind the scenes (through
@@ -163,7 +170,7 @@ Aerith.c       the whole launcher: program list, main window, floating icon
 Aerith.rc      resources: executable icon, interface bitmaps, version information
 res/           interface bitmaps: header logo (on the window background), floating icon
 ui/            application icon (hybootloader.ico, hybootloader.png)
-docs/          README logo
+docs/          README logo and screenshots
 ```
 
 The code is C89 (declarations at the top of each block) for the Visual Studio 2008
