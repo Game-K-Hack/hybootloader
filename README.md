@@ -116,6 +116,23 @@ keys. HyBootloader uses other class names, so the keys keep working.
 A program without a window (a background agent) is never started twice: tapping its
 tile again does nothing.
 
+### Programs that use WiFi
+
+The launcher HyBootloader replaces switched the WiFi on behind the scenes (through
+the stock WiFi manager). HyBootloader does not: it only starts programs. A program
+that needs WiFi must load the CSR Unifi driver itself before using `WifiDKCore.dll`.
+This is what LG's own factory test tool does:
+
+```c
+/* no key of HKLM\Drivers\Active has Name = "NDL1:" -> the driver is not loaded */
+ActivateDevice(L"Comm\\ndcufmp", 0);   /* then WDK_DMW_OpenVtDev() finds the adapter */
+```
+
+Without it, `WDK_DMW_OpenVtDev` waits for the adapter and returns no handle. Never
+copy a `WifiDKCore.dll` next to a program either: the copies extracted from the
+firmware image are rebuilt ROM modules that Windows CE refuses to load (error 193),
+instead of using the real one in `\Windows`.
+
 ## Building
 
 Requirements: Visual Studio 2008 with its Windows CE cross-compiler, the head unit's
