@@ -7,8 +7,8 @@
  *   <dossier de Aerith.exe>\Aerith.exe
  *   <dossier de Aerith.exe>\programmes\*.exe   (+ leurs DLL)
  *
- * Des qu'une autre application passe devant, la fenetre se cache et une icone
- * ronde, flottante et deplacable reste au-dessus de tout : un tap ramene
+ * Des qu'une autre application passe devant, la fenetre se cache et l'icone
+ * de l'appli, flottante et deplacable, reste au-dessus de tout : un tap ramene
  * HyBootloader au premier plan. Bouton "-" : retour a l'IHM LG en gardant
  * l'icone ; "X" : quitte tout.
  *
@@ -36,6 +36,10 @@
 #define MUTEX_NAME    L"HyBootloader"
 #define WM_APP_SHOW   (WM_APP + 1)
 
+/* Bitmaps de Aerith.rc, generes avec le logo (fond deja compose) */
+#define IDB_LOGO      101      /* en-tete, sur COL_BG */
+#define IDB_BUBBLE    102      /* icone flottante, BUBBLE x BUBBLE */
+
 #define MAX_PROGS     24
 #define TIMER_ID      1
 #define TIMER_MS      300
@@ -50,17 +54,18 @@
 #define TBTN          56       /* boutons "-" et "X" */
 #define TBTN_TOP      22
 #define TBTN_RIGHT    18
-#define BUBBLE        64       /* diametre de l'icone flottante */
+#define LOGO_TOP      14
+#define BUBBLE        64       /* cote de l'icone flottante */
+#define BUBBLE_R      13       /* rayon de ses coins, celui du logo a cette taille */
 #define DRAG_SLOP     10       /* au-dela, le toucher est un glisser */
 
 /* Couleurs */
 #define COL_BG        RGB( 18,  20,  26)
-#define COL_TITLE     RGB(240, 242, 245)
-#define COL_SUB       RGB(150, 200, 255)
+#define COL_SUB       RGB(196, 181, 253)
 #define COL_TEXT      RGB(225, 228, 232)
 #define COL_DIM       RGB(140, 146, 158)
 #define COL_TILE      RGB( 40,  44,  56)
-#define COL_ACCENT    RGB( 30, 136, 229)
+#define COL_ACCENT    RGB(124,  58, 237)   /* violet de la marque, #7C3AED */
 #define COL_RUN       RGB( 16, 185, 129)
 #define COL_CLOSE     RGB(200,  70,  70)
 
@@ -83,8 +88,9 @@ static WCHAR  g_selfName[MAX_PATH];
 static int    g_cx, g_cy;
 
 static HWND   g_main, g_bubble;
-static HFONT  g_fTitle, g_fSub, g_fTile, g_fBtn, g_fBubble;
+static HFONT  g_fSub, g_fTile, g_fBtn;
 static HBRUSH g_brBg, g_brTile, g_brAccent, g_brRun, g_brClose;
+static HBITMAP g_bmLogo, g_bmBubble;
 static int    g_pressed = HIT_NONE;
 static int    g_grace;              /* ticks ignores apres une mise au premier plan */
 
@@ -308,6 +314,22 @@ static void FillRound(HDC dc, const RECT *r, HBRUSH br, int radius)
     SelectObject(dc, ob);
 }
 
+/* Copie un bitmap de ressource a sa taille reelle ; centre si x < 0. */
+static void DrawBitmap(HDC dc, HBITMAP bm, int x, int y)
+{
+    BITMAP b;
+    HDC src;
+    HGDIOBJ old;
+
+    if (!bm || !GetObject(bm, sizeof(b), &b)) return;
+    if (x < 0) x = (g_cx - b.bmWidth) / 2;
+    src = CreateCompatibleDC(dc);
+    old = SelectObject(src, bm);
+    BitBlt(dc, x, y, b.bmWidth, b.bmHeight, src, 0, 0, SRCCOPY);
+    SelectObject(src, old);
+    DeleteDC(src);
+}
+
 static void PaintMain(HWND hWnd)
 {
     PAINTSTRUCT ps;
@@ -328,13 +350,10 @@ static void PaintMain(HWND hWnd)
     FillRect(mem, &rc, g_brBg);
     SetBkMode(mem, TRANSPARENT);
 
-    oldFont = SelectObject(mem, g_fTitle);
-    SetTextColor(mem, COL_TITLE);
-    SetRect(&r, 0, 20, rc.right, 70);
-    DrawTextW(mem, APP_TITLE, -1, &r, DT_CENTER | DT_SINGLELINE | DT_VCENTER);
-    SelectObject(mem, g_fSub);
+    DrawBitmap(mem, g_bmLogo, -1, LOGO_TOP);
+    oldFont = SelectObject(mem, g_fSub);
     SetTextColor(mem, COL_SUB);
-    SetRect(&r, 0, 70, rc.right, 100);
+    SetRect(&r, 0, 76, rc.right, 104);
     DrawTextW(mem, APP_SUBTITLE, -1, &r, DT_CENTER | DT_SINGLELINE | DT_VCENTER);
 
     SelectObject(mem, g_fBtn);
@@ -489,18 +508,24 @@ static LRESULT CALLBACK MainProc(HWND hWnd, UINT msg, WPARAM wp, LPARAM lp)
  *  Icone flottante                                                          *
  * ------------------------------------------------------------------------- */
 
-/* Disque de diametre d en bandes horizontales : le SDK CE n'a pas
-   CreateEllipticRgn. Calcul en coordonnees doublees, sans flottant. */
-static HRGN DiscRegion(int d)
+/* Carre arrondi de cote d, coins de rayon r, en bandes horizontales : le SDK CE
+   n'a ni CreateRoundRectRgn ni CreateEllipticRgn. Calcul en coordonnees
+   doublees, sans flottant. */
+static HRGN RoundSquareRegion(int d, int r)
 {
     HRGN rgn = CreateRectRgn(0, 0, 0, 0);
     int y;
 
     for (y = 0; y < d; y++) {
-        int dy = 2 * y + 1 - d, v = d * d - dy * dy, hw = 0;
+        int k = y < d - 1 - y ? y : d - 1 - y;   /* ligne depuis le bord le plus proche */
+        int in = 0;
         HRGN row;
-        while ((hw + 1) * (hw + 1) <= v) hw++;
-        row = CreateRectRgn((d - hw) / 2, y, (d + hw + 1) / 2, y + 1);
+        if (k < r) {
+            int dy = 2 * r - (2 * k + 1), v = 4 * r * r - dy * dy, hw = 0;
+            while ((hw + 1) * (hw + 1) <= v) hw++;
+            in = (2 * r - hw + 1) / 2;
+        }
+        row = CreateRectRgn(in, y, d - in, y + 1);
         CombineRgn(rgn, rgn, row, RGN_OR);
         DeleteObject(row);
     }
@@ -511,27 +536,9 @@ static void PaintBubble(HWND hWnd)
 {
     PAINTSTRUCT ps;
     HDC dc;
-    RECT rc;
-    HPEN pen;
-    HGDIOBJ op, ob, of;
 
     dc = BeginPaint(hWnd, &ps);
-    GetClientRect(hWnd, &rc);
-    FillRect(dc, &rc, g_brAccent);
-
-    pen = CreatePen(PS_SOLID, 3, RGB(255, 255, 255));
-    op = SelectObject(dc, pen);
-    ob = SelectObject(dc, GetStockObject(NULL_BRUSH));
-    Ellipse(dc, 2, 2, rc.right - 2, rc.bottom - 2);
-    SelectObject(dc, ob);
-    SelectObject(dc, op);
-    DeleteObject(pen);
-
-    SetBkMode(dc, TRANSPARENT);
-    SetTextColor(dc, RGB(255, 255, 255));
-    of = SelectObject(dc, g_fBubble);
-    DrawTextW(dc, L"Hy", -1, &rc, DT_CENTER | DT_SINGLELINE | DT_VCENTER);
-    SelectObject(dc, of);
+    DrawBitmap(dc, g_bmBubble, 0, 0);
     EndPaint(hWnd, &ps);
 }
 
@@ -625,11 +632,11 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev, LPWSTR lpCmdLine, int nShow
     g_brAccent = CreateSolidBrush(COL_ACCENT);
     g_brRun    = CreateSolidBrush(COL_RUN);
     g_brClose  = CreateSolidBrush(COL_CLOSE);
-    g_fTitle   = MakeFont(40, FW_BOLD);
     g_fSub     = MakeFont(22, FW_NORMAL);
     g_fTile    = MakeFont(26, FW_SEMIBOLD);
     g_fBtn     = MakeFont(32, FW_BOLD);
-    g_fBubble  = MakeFont(24, FW_BOLD);
+    g_bmLogo   = LoadBitmapW(hInst, MAKEINTRESOURCEW(IDB_LOGO));
+    g_bmBubble = LoadBitmapW(hInst, MAKEINTRESOURCEW(IDB_BUBBLE));
 
     memset(&wc, 0, sizeof(wc));
     wc.hInstance     = hInst;
@@ -647,7 +654,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev, LPWSTR lpCmdLine, int nShow
                                WS_POPUP, g_cx - BUBBLE - 8, (g_cy - BUBBLE) / 2,
                                BUBBLE, BUBBLE, NULL, NULL, hInst, NULL);
     if (!g_main || !g_bubble) return 1;
-    SetWindowRgn(g_bubble, DiscRegion(BUBBLE), FALSE);   /* region possedee par le systeme */
+    SetWindowRgn(g_bubble, RoundSquareRegion(BUBBLE, BUBBLE_R), FALSE);   /* region possedee par le systeme */
 
     BringUp();
     SetTimer(g_main, TIMER_ID, TIMER_MS, NULL);
@@ -657,11 +664,11 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev, LPWSTR lpCmdLine, int nShow
         DispatchMessageW(&msg);
     }
 
-    DeleteObject(g_fTitle);
     DeleteObject(g_fSub);
     DeleteObject(g_fTile);
     DeleteObject(g_fBtn);
-    DeleteObject(g_fBubble);
+    DeleteObject(g_bmLogo);
+    DeleteObject(g_bmBubble);
     DeleteObject(g_brBg);
     DeleteObject(g_brTile);
     DeleteObject(g_brAccent);

@@ -35,7 +35,7 @@
 HyBootloader replaces the `Aerith.exe` launcher found on modded SD cards of the
 LG Gen5 head unit (Hyundai i20 GB, Windows CE 7, i.MX6). The usual launcher is an
 MFC application of 1.3 MB that needs several DLLs and a configuration file;
-HyBootloader is a single C/Win32 executable of a few tens of kilobytes, with
+HyBootloader is a single C/Win32 executable of less than 100 KB, with
 **nothing to configure**: drop your programs in a `programmes` folder and each one
 gets its own button.
 
@@ -143,14 +143,15 @@ HyBootloader.
 
 ```
 Aerith.c       the whole launcher: program list, main window, floating icon
-Aerith.rc      version information
+Aerith.rc      resources: executable icon, interface bitmaps, version information
+res/           interface bitmaps: header logo (on the window background), floating icon
 ui/            application icon (hybootloader.ico, hybootloader.png)
 docs/          README logo
 ```
 
 The code is C89 (declarations at the top of each block) for the Visual Studio 2008
 C compiler. A few Windows CE gaps are worked around in the code: no
-`CreateEllipticRgn` (shapes are built from one-pixel bands), no `CreateFontW`
+`CreateRoundRectRgn` (the floating icon's shape is built from one-pixel bands), no `CreateFontW`
 (`CreateFontIndirectW` instead), and a Toolhelp snapshot is closed with
 `CloseToolhelp32Snapshot`.
 
