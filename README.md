@@ -98,6 +98,12 @@ header, **extracts the launcher embedded in the package**, copies it to
 `\Aerith.exe` and runs it. That is why the launcher must be replaced inside the
 `.lgu` file.
 
+<p align="center">
+  <img src="docs/hybootloader.drawio.en.png" alt="From the Update button to HyBootloader" width="640">
+</p>
+
+<sub>Diagram source: <code>docs/hybootloader.drawio</code> (draw.io).</sub>
+
 The copy at the root of the card still matters: the interface checks that it exists
 before extracting the embedded one, and other firmware paths (card inserted in
 update mode, recovery) run it directly. Keep the **same** executable in both places.
@@ -170,7 +176,7 @@ Aerith.c       the whole launcher: program list, main window, floating icon
 Aerith.rc      resources: executable icon, interface bitmaps, version information
 res/           interface bitmaps: header logo (on the window background), floating icon
 ui/            application icon (hybootloader.ico, hybootloader.png)
-docs/          README logo and screenshots
+docs/          README logo, screenshots and launch diagram (draw.io)
 ```
 
 The code is C89 (declarations at the top of each block) for the Visual Studio 2008
